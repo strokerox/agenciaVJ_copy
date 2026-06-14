@@ -1,5 +1,5 @@
-const express = require('express');
-const router = express.Router();
+import { Router } from 'express';
+const router = Router();
 
 // Temporary in-memory user store for example purposes
 const users = [];
@@ -45,4 +45,4 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Logout successful.' });
 });
 
-module.exports = router;
+export default router;

@@ -1,24 +1,29 @@
-const express = require('express');
-const router = express.Router();
-const authController = require('../controllers/authController');
-const ventasController = require('../controllers/ventaController');
-const clientesController = require('../controllers/clientesController');
-const db = require('../config/db');
+import { Router } from 'express';
+const router = Router();
+import { registrarUsuario, loginUsuario } from '../controllers/authController';
+import { crearVenta, obtenerVentas } from '../controllers/ventaController';
+import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente } from '../controllers/clientesController';
+import pool from '../config/db';
+
+// Ruta raíz de la API
+router.get('/', (req, res) => {
+    res.json({ message: 'API de la Agencia funcionando correctamente!' });
+});
 
 // Rutas de Clientes
-router.get('/clientes', clientesController.obtenerClientes);
-router.get('/clientes/:id', clientesController.obtenerClientePorId);
-router.post('/clientes', clientesController.crearCliente);
-router.put('/clientes/:id', clientesController.actualizarCliente);
-router.delete('/clientes/:id', clientesController.eliminarCliente);
+router.get('/clientes', obtenerClientes);
+router.get('/clientes/:id', obtenerClientePorId);
+router.post('/clientes', crearCliente);
+router.put('/clientes/:id', actualizarCliente);
+router.delete('/clientes/:id', eliminarCliente);
 
 // Rutas de Autenticacion
-router.post('/auth/register', authController.registrarUsuario);
-router.post('/auth/login', authController.loginUsuario);
+router.post('/auth/register', registrarUsuario);
+router.post('/auth/login', loginUsuario);
 
 // Rutas de Ventas
-router.post('/ventas', ventasController.crearVenta);
-router.get('/ventas', ventasController.obtenerVentas);
+router.post('/ventas', crearVenta);
+router.get('/ventas', obtenerVentas);
 
 // Rutas Auxiliares
 router.get('/aerolineas', async (req, res) => {
@@ -30,6 +35,6 @@ router.get('/aerolineas', async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
 
 

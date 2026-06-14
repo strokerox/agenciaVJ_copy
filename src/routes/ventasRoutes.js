@@ -1,10 +1,10 @@
-const express = require('express');
-const router = express.Router();
-const ventasController = require('../controllers/ventaController');
+import { Router } from 'express';
+const router = Router();
+import { getVentasFiltradas, obtenerVentas, crearVenta } from '../controllers/ventasController';
 
 // Ruta para obtener y filtrar ventas
-router.get('/buscar', ventaController.getVentasFiltradas);
-router.get('/', ventasController.obtenerVentas);
-router.post('/', ventasController.crearVenta);
+router.get('/buscar', getVentasFiltradas);
+router.get('/', obtenerVentas);
+router.post('/', crearVenta);
 
-module.exports = router;
+export default router;
