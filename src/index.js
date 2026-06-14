@@ -1,13 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-const apiRoutes = require('./routes/api');
-require('dotenv').config();
+import express, { json } from 'express';
+import cors from 'cors';
+import apiRoutes from './routes/api.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(json());
 
 // Rutas
 app.use('/api', apiRoutes);

@@ -1,9 +1,9 @@
 import { Router } from 'express';
 const router = Router();
-import { registrarUsuario, loginUsuario } from '../controllers/authController';
-import { crearVenta, obtenerVentas } from '../controllers/ventaController';
-import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente } from '../controllers/clientesController';
-import pool from '../config/db';
+import { registrarUsuario, loginUsuario } from '../controllers/authController.js';
+import { crearVenta, obtenerVentas } from '../controllers/ventaController.js';
+import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente } from '../controllers/clientesController.js';
+import db from '../config/db.js';
 
 // Ruta raíz de la API
 router.get('/', (req, res) => {
@@ -36,5 +36,3 @@ router.get('/aerolineas', async (req, res) => {
 });
 
 export default router;
-
-

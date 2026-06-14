@@ -1,4 +1,4 @@
-const db = require('../config/db').default;
+import db from '../config/db.js';
 
 const crearVenta = async (req, res) => {
     try {
@@ -108,4 +108,4 @@ const getVentasFiltradas = async (req, res) => {
     }
 };
 
-module.exports = { crearVenta, obtenerVentas, getVentasFiltradas };
+export { crearVenta, obtenerVentas, getVentasFiltradas };

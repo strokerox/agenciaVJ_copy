@@ -1,4 +1,4 @@
-const db = require('../config/db').default;
+import db from '../config/db.js';
 
 const obtenerClientes = async (req, res) => {
     try {
@@ -67,4 +67,4 @@ const eliminarCliente = async (req, res) => {
     }
 };
 
-module.exports = { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente };
+export { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente };
