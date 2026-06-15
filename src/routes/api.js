@@ -1,7 +1,7 @@
 import { Router } from 'express';
 const router = Router();
 import { registrarUsuario, loginUsuario } from '../controllers/authController.js';
-import { crearVenta, obtenerVentas } from '../controllers/ventaController.js';
+import { crearVenta, obtenerVentas, statsVenta, recentVentas } from '../controllers/ventaController.js';
 import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente } from '../controllers/clientesController.js';
 import db from '../config/db.js';
 
@@ -24,6 +24,8 @@ router.post('/auth/login', loginUsuario);
 // Rutas de Ventas
 router.post('/ventas', crearVenta);
 router.get('/ventas', obtenerVentas);
+router.get('/ventas/stats', statsVenta);
+router.get('/ventas/recent', recentVentas);
 
 // Rutas Auxiliares
 router.get('/aerolineas', async (req, res) => {
