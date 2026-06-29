@@ -1,4 +1,4 @@
-const db = require('../config/db');
+import db from '../config/db.js';
 
 class Reserva {
     static async crear(localizador, fechaVenta = null) {
@@ -15,6 +15,17 @@ class Reserva {
         const [rows] = await db.query('SELECT * FROM reservas');
         return rows;
     }
+
+    //método para acumular el costo de los paquetes al total de la reserva
+    static async actualizarMontoTotal(localizadorId, montoExtra, connection = null) {
+        // Si se pasa una conexión (para una transacción), se usa esa; si no, se usa el pool global 'db'
+        const conn = connection || db;
+        const [result] = await conn.execute(
+            'UPDATE reservas SET monto_total = monto_total + ? WHERE localizador = ?',
+            [montoExtra, localizadorId]
+        );
+        return result.affectedRows;
+    }
 }
 
-module.exports = Reserva;
+export default Reserva;

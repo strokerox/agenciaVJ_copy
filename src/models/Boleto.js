@@ -1,4 +1,4 @@
-const db = require('../config/db');
+import db from '../config/db.js';
 
 class Boleto {
     static async obtenerTodos() {
@@ -29,4 +29,4 @@ class Boleto {
     }
 }
 
-module.exports = Boleto;
+export default Boleto;

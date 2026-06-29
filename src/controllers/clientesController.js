@@ -1,5 +1,6 @@
 import db from '../config/db.js';
 
+// Recupera la lista completa de clientes registrados
 const obtenerClientes = async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM clientes');
@@ -10,6 +11,7 @@ const obtenerClientes = async (req, res) => {
     }
 };
 
+// Obtiene los detalles de un cliente específico mediante su ID
 const obtenerClientePorId = async (req, res) => {
     try {
         const { id } = req.params;
@@ -24,6 +26,7 @@ const obtenerClientePorId = async (req, res) => {
     }
 };
 
+// Registra un nuevo cliente en la base de datos
 const crearCliente = async (req, res) => {
     try {
         const { nombre, apellido } = req.body;
@@ -38,6 +41,7 @@ const crearCliente = async (req, res) => {
     }
 };
 
+// Actualiza la información de un cliente existente
 const actualizarCliente = async (req, res) => {
     try {
         const { id } = req.params;
@@ -53,6 +57,7 @@ const actualizarCliente = async (req, res) => {
     }
 };
 
+// Elimina la ficha de un cliente del sistema
 const eliminarCliente = async (req, res) => {
     try {
         const { id } = req.params;
