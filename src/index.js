@@ -11,7 +11,7 @@ app.use(cors()); // Permite peticiones desde diferentes orígenes (Frontend)
 app.use(json()); // Permite que la API interprete el cuerpo de las peticiones en formato JSON
 
 // Endpoint de prueba para verificar que el servidor está activo
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => {
     res.send('API de la Agencia funcionando correctamente!');
 });

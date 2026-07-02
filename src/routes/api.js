@@ -1,7 +1,7 @@
 import { Router } from 'express';
 const router = Router();
-import { listarPaquetes, crearPaquete, venderPaquete } from '../controllers/paquetesController.js';
-import { registrarUsuario, loginUsuario } from '../controllers/authController.js';
+import { listarPaquetes, crearPaquete } from '../controllers/paquetesController.js';
+import { registrarUsuario, loginUsuario, obtenerUsuarios, actualizarUsuario, eliminarUsuario } from '../controllers/authController.js';
 import { crearVenta, obtenerVentas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta } from '../controllers/ventaController.js';
 import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente } from '../controllers/clientesController.js';
 import authMiddleware from '../middleware/authMiddleware.js';
@@ -23,6 +23,11 @@ router.delete('/clientes/:id', eliminarCliente);
 router.post('/auth/register', registrarUsuario);
 router.post('/auth/login', loginUsuario);
 
+// Rutas de Usuarios (Administración)
+router.get('/usuarios', authMiddleware, obtenerUsuarios);
+router.put('/usuarios/:id', authMiddleware, actualizarUsuario);
+router.delete('/usuarios/:id', authMiddleware, eliminarUsuario);
+
 // Rutas de Ventas
 router.post('/ventas', authMiddleware, crearVenta);
 router.get('/ventas', obtenerVentas);
@@ -34,10 +39,6 @@ router.delete('/ventas/:id', authMiddleware, eliminarVenta);
 // Rutas del catálogo
 router.get('/paquetes', listarPaquetes);
 router.post('/paquetes', crearPaquete);
-
-// Ruta para la transacción de venta
-router.post('/paquetes/vender', venderPaquete);
-
 
 // Rutas Auxiliares
 router.get('/aerolineas', async (req, res) => {
