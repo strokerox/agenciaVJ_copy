@@ -59,6 +59,27 @@ const crearVenta = async (req, res) => {
     }
 };
 
+const actualizarEstadoVenta = async (req, res) => {
+    try {
+        const { localizador } = req.params;
+        const { estado } = req.body; // Ej: 'Emitido', 'Pendiente', 'Cancelado'
+
+        if (!estado) {
+            return res.status(400).json({ exito: false, mensaje: 'El estado es requerido' });
+        }
+
+        const [result] = await db.execute('UPDATE reservas SET estado = ? WHERE localizador = ?', [estado, localizador]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ exito: false, mensaje: 'Reserva no encontrada con ese localizador' });
+        }
+        res.json({ exito: true, mensaje: 'Estado de la reserva actualizado correctamente' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ exito: false, mensaje: 'Error al actualizar el estado de la venta' });
+    }
+};
+
 const eliminarVenta = async (req, res) => {
     try {
         const { id } = req.params;
@@ -355,4 +376,4 @@ const generarReporteVentas = async (req, res) => {
     }
 };
 
-export { crearVenta, obtenerVentas, getVentasFiltradas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta };
+export { crearVenta, obtenerVentas, getVentasFiltradas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta, actualizarEstadoVenta };
