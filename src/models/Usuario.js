@@ -1,4 +1,4 @@
-const db = require('../config/db');
+import db from '../config/db.js';
 
 class Usuario {
     static async crear(nombre, email, passwordHash) {
@@ -17,4 +17,4 @@ class Usuario {
     }
 }
 
-module.exports = Usuario;
+export default Usuario;

@@ -6,18 +6,20 @@ dotenv.config();
 
 const app = express();
 
-// Middlewares
-app.use(cors());
-app.use(json());
+// Configuración de Middlewares Globales
+app.use(cors()); // Permite peticiones desde diferentes orígenes (Frontend)
+app.use(json()); // Permite que la API interprete el cuerpo de las peticiones en formato JSON
 
-// Rutas
-app.use('/api', apiRoutes);
-
-// Servidor
+// Endpoint de prueba para verificar que el servidor está activo
 const PORT = process.env.PORT || 5000;
 app.get('/', (req, res) => {
     res.send('API de la Agencia funcionando correctamente!');
 });
+
+// Prefijo '/api' para todas las rutas definidas en el módulo apiRoutes
+app.use('/api', apiRoutes);
+
+// Inicio del servidor en el puerto configurado
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
