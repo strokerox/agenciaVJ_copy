@@ -1,12 +1,8 @@
 import { createPool } from 'mysql2';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 import dotenv from 'dotenv';
 
-// Configuración de rutas para cargar el archivo .env correctamente en entornos ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-dotenv.config({ path: resolve(__dirname, '../.env') });
+dotenv.config({ path: resolve(process.cwd(), '.env') });
 
 // Creación de un Pool de conexiones para mejorar la eficiencia y manejo de múltiples peticiones simultáneas
 const pool = createPool({
