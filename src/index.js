@@ -1,8 +1,7 @@
+import 'dotenv/config';
 import express, { json } from 'express';
 import cors from 'cors';
 import apiRoutes from './routes/api.js';
-import dotenv from 'dotenv';
-dotenv.config();
 
 const app = express();
 
@@ -11,7 +10,7 @@ app.use(cors()); // Permite peticiones desde diferentes orígenes (Frontend)
 app.use(json()); // Permite que la API interprete el cuerpo de las peticiones en formato JSON
 
 // Endpoint de prueba para verificar que el servidor está activo
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => {
     res.send('API de la Agencia funcionando correctamente!');
 });
@@ -20,6 +19,13 @@ app.get('/', (req, res) => {
 app.use('/api', apiRoutes);
 
 // Inicio del servidor en el puerto configurado
-app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+app.listen(PORT, async () => {
+    try {
+        const db = await import('./config/db.js');
+        await db.default.query('SELECT 1');
+        console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    } catch (error) {
+        console.error('Error de conexión a la base de datos al iniciar el servidor:', error.message);
+        process.exit(1);
+    }
 });
