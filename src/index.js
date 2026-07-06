@@ -19,6 +19,13 @@ app.get('/', (req, res) => {
 app.use('/api', apiRoutes);
 
 // Inicio del servidor en el puerto configurado
-app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+app.listen(PORT, async () => {
+    try {
+        const db = await import('./config/db.js');
+        await db.default.query('SELECT 1');
+        console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    } catch (error) {
+        console.error('Error de conexión a la base de datos al iniciar el servidor:', error.message);
+        process.exit(1);
+    }
 });
