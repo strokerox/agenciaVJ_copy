@@ -25,6 +25,11 @@ router.delete('/clientes/:id', eliminarCliente);
 router.post('/auth/register', registrarUsuario);
 router.post('/auth/login', loginUsuario);
 
+// Rutas de Usuarios (Administración)
+router.get('/usuarios', authMiddleware, obtenerUsuarios);
+router.put('/usuarios/:id', authMiddleware, actualizarUsuario);
+router.delete('/usuarios/:id', authMiddleware, eliminarUsuario);
+
 // Rutas de Ventas
 router.post('/ventas', authMiddleware, crearVenta);
 router.get('/ventas', obtenerVentas);
@@ -37,10 +42,6 @@ router.put('/ventas/estado/:localizador', authMiddleware, actualizarEstadoVenta)
 // Rutas del catálogo
 router.get('/paquetes', listarPaquetes);
 router.post('/paquetes', crearPaquete);
-
-// Ruta para la transacción de venta
-router.post('/paquetes/vender', venderPaquete);
-
 
 // Rutas Auxiliares
 router.get('/aerolineas', obtenerAerolineas);
