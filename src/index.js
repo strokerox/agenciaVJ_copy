@@ -8,8 +8,8 @@ const app = express();
 // Configuración de Middlewares Globales
 app.use(cors()); // Permite peticiones desde diferentes orígenes (Frontend)
     const origenesPermitidos = [
-    '[https://agencia-vj-front.vercel.app/](https://agencia-vj-front.vercel.app/)', // Tu frontend en Vercel
-    '[http://localhost:5173](http://localhost:5173)' // Para desarrollo local con Vite
+    'https://agencia-vj-front.vercel.app', // frontend en Vercel
+    'http://localhost:5173' // Para desarrollo local con Vite
     ];
 
     const opcionesCors = {
