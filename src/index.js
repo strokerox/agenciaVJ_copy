@@ -6,9 +6,9 @@ import apiRoutes from './routes/api.js';
 const app = express();
 
 // Configuración de Middlewares Globales
-app.use(cors()); // Permite peticiones desde diferentes orígenes (Frontend)
+app.use(cors(opcionesCors));// Permite peticiones desde diferentes orígenes (Frontend)
     const origenesPermitidos = [
-    '[https://agencia-vj-front.vercel.app/](https://agencia-vj-front.vercel.app/)', // Tu frontend en Vercel
+    'https://agencia-vj-front.vercel.app(https://agencia-vj-front.vercel.app/)', // frontend en Vercel
     '[http://localhost:5173](http://localhost:5173)' // Para desarrollo local con Vite
     ];
 
@@ -22,7 +22,7 @@ app.use(cors()); // Permite peticiones desde diferentes orígenes (Frontend)
     }
     };
 
-app.use(cors(opcionesCors));
+
 app.use(json()); // Permite que la API interprete el cuerpo de las peticiones en formato JSON
 
 // Endpoint de prueba para verificar que el servidor está activo
