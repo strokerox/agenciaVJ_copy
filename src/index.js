@@ -7,6 +7,22 @@ const app = express();
 
 // Configuración de Middlewares Globales
 app.use(cors()); // Permite peticiones desde diferentes orígenes (Frontend)
+    const origenesPermitidos = [
+    'https://agencia-vj-front.vercel.app', // frontend en Vercel
+    'http://localhost:5173' // Para desarrollo local con Vite
+    ];
+
+    const opcionesCors = {
+    origin: function (origin, callback) {
+        if (!origin || origenesPermitidos.indexOf(origin) !== -1) {
+        callback(null, true);
+        } else {
+        callback(new Error('Bloqueado por CORS: Origen no autorizado'));
+        }
+    }
+    };
+
+app.use(cors(opcionesCors));
 app.use(json()); // Permite que la API interprete el cuerpo de las peticiones en formato JSON
 
 // Endpoint de prueba para verificar que el servidor está activo
