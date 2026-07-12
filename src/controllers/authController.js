@@ -4,11 +4,16 @@ import db from '../config/db.js';
 
 const registrarUsuario = async (req, res) => {
     try {
-        const { nombre, email, password } = req.body;
+        // 1. Extraemos el 'rol' de la petición
+        const { nombre, email, password, rol } = req.body;
 
         if (!nombre || !email || !password) {
             return res.status(400).json({ exito: false, mensaje: 'Nombre, email y password son requeridos' });
         }
+
+        // 2. Validación estricta del rol (Previene inyección de roles falsos)
+        // Si el rol enviado no es explícitamente 'admin', se asigna 'agente' por seguridad.
+        const rolAsignado = (rol === 'admin') ? 'admin' : 'agente';
 
         const [existing] = await db.query('SELECT * FROM usuarios WHERE email = ?', [email]);
         if (existing.length > 0) {
@@ -17,15 +22,18 @@ const registrarUsuario = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        await db.execute('INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)', [nombre, email, hashedPassword]);
+        // 3. Se actualiza el INSERT para incluir la columna rol
+        await db.execute(
+            'INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, ?)', 
+            [nombre, email, hashedPassword, rolAsignado]
+        );
 
-        res.status(201).json({ exito: true, mensaje: 'Usuario registrado correctamente' });
+        res.status(201).json({ exito: true, mensaje: `Usuario registrado correctamente como ${rolAsignado}` });
     } catch (error) {
-        console.error("ERROR EN REGISTRO:", error); // Log detallado
+        console.error("ERROR EN REGISTRO:", error);
         res.status(500).json({ exito: false, mensaje: 'Error interno al registrar el usuario' });
     }
 };
-
 const loginUsuario = async (req, res) => {
     try {
         const { email, password } = req.body;

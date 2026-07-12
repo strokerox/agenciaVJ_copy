@@ -27,17 +27,70 @@ const obtenerClientePorId = async (req, res) => {
 };
 
 // Registra un nuevo cliente en la base de datos
-const crearCliente = async (req, res) => {
+const { parsePhoneNumberFromString } = require('libphonenumber-js');
+    exports.crearCliente = async (req, res) => {
+    const { nombre, apellido, cedula, telefono, email, nacionalidad } = req.body;
+
     try {
-        const { nombre, apellido, cedula, telefono, email, nacionalidad } = req.body;
-        if (!nombre || !apellido) {
-            return res.status(400).json({ exito: false, mensaje: 'Nombre y apellido son requeridos' });
+        // --- 1. VALIDACIÓN DE CÉDULA Y NACIONALIDAD ---
+        // Exige que empiece por V-, E- o P- seguido de 6 a 10 dígitos.
+        const formatoCedulaRegex = /^(V|E|P)-\d{6,10}$/i;
+        
+        if (!formatoCedulaRegex.test(cedula)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Formato de documento inválido. Debe usar V-XXXX, E-XXXX o P-XXXX.' 
+            });
         }
-        const [result] = await db.execute('INSERT INTO clientes (nombre, apellido, cedula, telefono, email, nacionalidad) VALUES (?, ?, ?, ?, ?, ?)', [nombre, apellido, cedula, telefono, email, nacionalidad]);
-        res.status(201).json({ exito: true, mensaje: 'Cliente creado correctamente', id: result.insertId });
+
+        // Validación lógica cruzada: Si es venezolano, debe usar V-
+        const prefijo = cedula.toUpperCase().charAt(0);
+        const nacNormalizada = nacionalidad.toLowerCase();
+
+        if (nacNormalizada === 'venezolana' && prefijo !== 'V') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Incongruencia: Un cliente de nacionalidad venezolana debe tener una cédula que inicie con V-.' 
+            });
+        }
+        if (nacNormalizada === 'extranjera' && prefijo !== 'E' && prefijo !== 'P') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Incongruencia: Documento no coincide con la nacionalidad extranjera.' 
+            });
+        }
+
+        // --- 2. VALIDACIÓN DEL TELÉFONO ---
+        const phoneNumber = parsePhoneNumberFromString(telefono);
+
+        if (!phoneNumber || !phoneNumber.isValid()) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'El número de teléfono proporcionado no es válido para su localidad.' 
+            });
+        }
+        
+        const telefonoInternacional = phoneNumber.number; // Guarda en formato +58...
+
+        // --- 3. INSERCIÓN EN MYSQL ---
+        // Convertimos la cédula a mayúsculas para mantener uniformidad en la base de datos
+        const result = await Cliente.crear(
+            nombre, 
+            apellido, 
+            cedula.toUpperCase(), 
+            telefonoInternacional, 
+            email, 
+            nacionalidad
+        );
+        
+        res.status(201).json({ success: true, message: 'Cliente registrado con éxito.' });
+
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ exito: false, mensaje: 'Error al crear el cliente' });
+        // Si el motor MySQL detecta que la cédula (única) ya existe, arrojará ER_DUP_ENTRY
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ success: false, message: 'La cédula o el correo ya se encuentran registrados en el sistema.' });
+        }
+        res.status(500).json({ success: false, message: 'Error interno del servidor', error: error.message });
     }
 };
 

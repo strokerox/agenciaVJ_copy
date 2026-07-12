@@ -7,6 +7,8 @@ import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, 
 import { obtenerAerolineas, crearAerolinea, actualizarAerolinea, eliminarAerolinea } from '../controllers/aerolineasController.js';
 import { obtenerUsuarios, actualizarUsuario, eliminarUsuario } from '../controllers/usersController.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import { verificarToken } from '../middleware/authMiddleware.js';
+import { verificarRolAdmin } from '../middleware/rolMiddleware.js';
 import db from '../config/db.js';
 
 // Ruta raíz de la API
@@ -29,6 +31,16 @@ router.post('/auth/login', loginUsuario);
 router.get('/usuarios', authMiddleware, obtenerUsuarios);
 router.put('/usuarios/:id', authMiddleware, actualizarUsuario);
 router.delete('/usuarios/:id', authMiddleware, eliminarUsuario);
+
+// --- RUTAS PERMITIDAS PARA ADMIN Y AGENTE (Vista y Agregar) ---
+// Todo usuario logueado (verificarToken) puede consultar y crear
+router.get('/', verificarToken, obtenerAerolineas);
+router.post('/', verificarToken, crearAerolinea);
+
+// --- RUTAS EXCLUSIVAS PARA ADMIN (Modificar y Borrar) ---
+// Se añade "verificarRolAdmin" para bloquear a los agentes
+router.put('/:id', verificarToken, verificarRolAdmin, actualizarAerolinea);
+router.delete('/:id', verificarToken, verificarRolAdmin, eliminarAerolinea);
 
 // Rutas de Ventas
 router.post('/ventas', authMiddleware, crearVenta);
