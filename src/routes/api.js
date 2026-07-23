@@ -1,12 +1,14 @@
 import { Router } from 'express';
 const router = Router();
-import { listarPaquetes, crearPaquete, venderPaquete } from '../controllers/paquetesController.js';
+import { listarPaquetes, crearPaquete, venderPaquete, generarReportePaquetes } from '../controllers/paquetesController.js';
 import { registrarUsuario, loginUsuario } from '../controllers/authController.js';
 import { crearVenta, obtenerVentas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta, actualizarEstadoVenta } from '../controllers/ventaController.js';
-import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente } from '../controllers/clientesController.js';
+import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente, generarReporteClientes } from '../controllers/clientesController.js';
 import { obtenerAerolineas, crearAerolinea, actualizarAerolinea, eliminarAerolinea } from '../controllers/aerolineasController.js';
 import { obtenerUsuarios, actualizarUsuario, eliminarUsuario } from '../controllers/usersController.js';
+import { misComisiones, todasLasComisiones, pagarComision } from '../controllers/comisionesController.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import { isAdmin } from '../middleware/roleMiddleware.js';
 import db from '../config/db.js';
 
 // Ruta raíz de la API
@@ -16,6 +18,7 @@ router.get('/', (req, res) => {
 
 // Rutas de Clientes
 router.get('/clientes', obtenerClientes);
+router.get('/clientes/reporte', generarReporteClientes);
 router.get('/clientes/:id', obtenerClientePorId);
 router.post('/clientes', crearCliente);
 router.put('/clientes/:id', actualizarCliente);
@@ -25,10 +28,10 @@ router.delete('/clientes/:id', eliminarCliente);
 router.post('/auth/register', registrarUsuario);
 router.post('/auth/login', loginUsuario);
 
-// Rutas de Usuarios (Administración)
-router.get('/usuarios', authMiddleware, obtenerUsuarios);
-router.put('/usuarios/:id', authMiddleware, actualizarUsuario);
-router.delete('/usuarios/:id', authMiddleware, eliminarUsuario);
+// Rutas de Usuarios (Administración) - PROTEGIDAS
+router.get('/usuarios', authMiddleware, isAdmin, obtenerUsuarios);
+router.put('/usuarios/:id', authMiddleware, isAdmin, actualizarUsuario);
+router.delete('/usuarios/:id', authMiddleware, isAdmin, eliminarUsuario);
 
 // Rutas de Ventas
 router.post('/ventas', authMiddleware, crearVenta);
@@ -39,8 +42,14 @@ router.get('/ventas/reporte', generarReporteVentas);
 router.delete('/ventas/:id', authMiddleware, eliminarVenta);
 router.put('/ventas/estado/:localizador', authMiddleware, actualizarEstadoVenta);
 
+// Rutas de Comisiones
+router.get('/comisiones/mis-comisiones', authMiddleware, misComisiones);
+router.get('/comisiones/todas', authMiddleware, isAdmin, todasLasComisiones);
+router.put('/comisiones/pagar/:id_transaccion', authMiddleware, isAdmin, pagarComision);
+
 // Rutas del catálogo
 router.get('/paquetes', listarPaquetes);
+router.get('/paquetes/reporte', generarReportePaquetes);
 router.post('/paquetes', crearPaquete);
 
 // Rutas Auxiliares
@@ -48,9 +57,5 @@ router.get('/aerolineas', obtenerAerolineas);
 router.post('/aerolineas', authMiddleware, crearAerolinea);
 router.put('/aerolineas/:id', authMiddleware, actualizarAerolinea);
 router.delete('/aerolineas/:id', authMiddleware, eliminarAerolinea);
-
-router.get('/usuarios', authMiddleware, obtenerUsuarios);
-router.put('/usuarios/:id', authMiddleware, actualizarUsuario);
-router.delete('/usuarios/:id', authMiddleware, eliminarUsuario);
 
 export default router;

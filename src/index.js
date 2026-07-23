@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { json } from 'express';
 import cors from 'cors';
 import apiRoutes from './routes/api.js';
+import mantenimientoRoutes from './routes/mantenimientoRoutes.js';
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.get('/', (req, res) => {
 
 // Prefijo '/api' para todas las rutas definidas en el módulo apiRoutes
 app.use('/api', apiRoutes);
+app.use('/api/mantenimiento', mantenimientoRoutes);
 
 // Inicio del servidor en el puerto configurado
 app.listen(PORT, async () => {

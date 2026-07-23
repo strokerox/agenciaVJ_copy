@@ -17,9 +17,23 @@ const registrarUsuario = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        await db.execute('INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)', [nombre, email, hashedPassword]);
+        const [result] = await db.execute('INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, ?)', [nombre, email, hashedPassword, 'agente']);
+        
+        const userId = result.insertId;
+        const secret = process.env.JWT_SECRET || 'default_jwt_secret';
+        
+        const token = jwt.sign(
+            { id: userId, nombre, email, rol: 'agente' }, 
+            secret, 
+            { expiresIn: '24h' }
+        );
 
-        res.status(201).json({ exito: true, mensaje: 'Usuario registrado correctamente' });
+        res.status(201).json({ 
+            exito: true, 
+            mensaje: 'Usuario registrado correctamente',
+            token,
+            user: { id: userId, nombre, email, rol: 'agente' }
+        });
     } catch (error) {
         console.error("ERROR EN REGISTRO:", error); // Log detallado
         res.status(500).json({ exito: false, mensaje: 'Error interno al registrar el usuario' });
@@ -50,7 +64,7 @@ const loginUsuario = async (req, res) => {
         const userId = user.id_usuario || user.id; 
         
         const token = jwt.sign(
-            { id: userId, nombre: user.nombre, email: user.email }, 
+            { id: userId, nombre: user.nombre, email: user.email, rol: user.rol }, 
             secret, 
             { expiresIn: '24h' }
         );
@@ -58,7 +72,7 @@ const loginUsuario = async (req, res) => {
         res.json({ 
             exito: true, 
             token, 
-            user: { id: userId, nombre: user.nombre, email: user.email } 
+            user: { id: userId, nombre: user.nombre, email: user.email, rol: user.rol } 
         });
     } catch (error) {
         console.error("ERROR EN LOGIN:", error); 

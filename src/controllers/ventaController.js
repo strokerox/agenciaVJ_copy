@@ -255,8 +255,8 @@ const recentVentas = async (req, res) => {
 
 const generarReporteVentas = async (req, res) => {
     try {
-        // 1. EXTRAER PARÁMETROS DE FILTRADO (Desde la URL, ej: ?fechaInicio=2023-01-01&fechaFin=2023-12-31&tipo=VIP)
-        const { fechaInicio, fechaFin, tipo } = req.query;
+        // 1. EXTRAER PARÁMETROS DE FILTRADO
+        const { fechaInicio, fechaFin, tipo, aerolinea } = req.query;
 
         // 2. CONSTRUIR LA CONSULTA SQL DINÁMICA
         let sqlQuery = `
@@ -284,10 +284,16 @@ const generarReporteVentas = async (req, res) => {
             queryParams.push(fechaInicio, fechaFin);
         }
 
-        // Filtro por tipo (Asegúrate de que la columna 'tipo' exista en tu tabla 'boletos' o ajústala a la tabla correspondiente)
+        // Filtro por tipo 
         if (tipo) {
             sqlQuery += ` AND b.tipo = ?`; 
             queryParams.push(tipo);
+        }
+
+        // Filtro por aerolinea
+        if (aerolinea) {
+            sqlQuery += ` AND a.nombre = ?`;
+            queryParams.push(aerolinea);
         }
 
         sqlQuery += ` ORDER BY b.fecha_ida DESC`;
@@ -310,8 +316,8 @@ const generarReporteVentas = async (req, res) => {
         doc.moveDown();
        
         // Si hay filtros aplicados, mostrarlos en el PDF (Opcional pero recomendado)
-        if (fechaInicio || tipo) {
-            doc.fontSize(10).text(`Filtros: ${fechaInicio ? `Desde ${fechaInicio} Hasta ${fechaFin}` : ''} ${tipo ? `| Tipo: ${tipo}` : ''}`, { align: 'center' });
+        if (fechaInicio || tipo || aerolinea) {
+            doc.fontSize(10).text(`Filtros: ${fechaInicio ? `Desde ${fechaInicio} Hasta ${fechaFin}` : ''} ${tipo ? `| Tipo: ${tipo}` : ''} ${aerolinea ? `| Aerolínea: ${aerolinea}` : ''}`, { align: 'center' });
         }
         doc.moveDown();
 
