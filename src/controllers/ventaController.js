@@ -21,7 +21,8 @@ const crearVenta = async (req, res) => {
             monto_venta, 
             fecha_venta,
             aerolinea_id,
-            cliente_id
+            cliente_id,
+            tipo = 'BOLETO'
         } = req.body;
 
         // Validación y Recálculo en Servidor (Seguridad Financiera)
@@ -40,8 +41,8 @@ const crearVenta = async (req, res) => {
         );
 
         const queryBoleto = `INSERT INTO boletos 
-            (numero_boleto, ruta, fecha_ida, fecha_retorno, monto_neto, fee_emision, monto_venta, utilidad, fee_comision, aerolinea_id, cliente_id, localizador_id, usuario_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (numero_boleto, ruta, fecha_ida, fecha_retorno, monto_neto, fee_emision, monto_venta, utilidad, fee_comision, aerolinea_id, cliente_id, localizador_id, usuario_id, tipo) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         
         await db.execute(queryBoleto, [
             numero_boleto, 
@@ -56,7 +57,8 @@ const crearVenta = async (req, res) => {
             aerolinea_id,
             cliente_id,
             localizador,
-            usuarioId
+            usuarioId,
+            tipo
         ]);
 
         res.status(201).json({ exito: true, mensaje: 'Venta registrada correctamente' });
@@ -284,7 +286,11 @@ const generarReporteVentas = async (req, res) => {
                 b.monto_neto,
                 b.fee_emision,
                 b.monto_venta,
-                b.utilidad
+                b.fee_comision,
+                b.utilidad,
+                b.tipo,
+                r.estado_pago as estado,
+                r.fecha_venta
             FROM boletos b
             JOIN clientes c ON b.cliente_id = c.id_cliente
             JOIN aerolineas a ON b.aerolinea_id = a.id_aerolinea
