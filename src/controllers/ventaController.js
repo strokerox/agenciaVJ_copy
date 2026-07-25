@@ -75,7 +75,7 @@ const actualizarEstadoVenta = async (req, res) => {
             return res.status(400).json({ exito: false, mensaje: 'El estado es requerido' });
         }
 
-        const [result] = await db.execute('UPDATE reservas SET estado = ? WHERE localizador = ?', [estado, localizador]);
+        const [result] = await db.execute('UPDATE reservas SET estado_pago = ? WHERE localizador = ?', [estado, localizador]);
         
         if (result.affectedRows === 0) {
             return res.status(404).json({ exito: false, mensaje: 'Reserva no encontrada con ese localizador' });
@@ -113,7 +113,9 @@ const obtenerVentas = async (req, res) => {
                 b.monto_venta,
                 b.utilidad,
                 b.fee_comision,
-                b.tipo
+                b.tipo,
+                r.estado_pago,
+                r.fecha_venta
             FROM boletos b
             JOIN clientes c ON b.cliente_id = c.id_cliente
             JOIN aerolineas a ON b.aerolinea_id = a.id_aerolinea
@@ -141,7 +143,9 @@ const getVentasFiltradas = async (req, res) => {
             b.ruta,
             b.fecha_ida,
             b.monto_venta,
-            b.utilidad
+            b.utilidad,
+            r.estado_pago,
+            r.fecha_venta
         FROM boletos b
         JOIN clientes c ON b.cliente_id = c.id_cliente
         JOIN aerolineas a ON b.aerolinea_id = a.id_aerolinea
@@ -280,11 +284,7 @@ const generarReporteVentas = async (req, res) => {
                 b.monto_neto,
                 b.fee_emision,
                 b.monto_venta,
-                b.fee_comision,
-                b.utilidad,
-                b.tipo,
-                r.estado,
-                r.fecha_venta
+                b.utilidad
             FROM boletos b
             JOIN clientes c ON b.cliente_id = c.id_cliente
             JOIN aerolineas a ON b.aerolinea_id = a.id_aerolinea
