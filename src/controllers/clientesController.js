@@ -1,6 +1,13 @@
 import db from '../config/db.js';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const logoPath = path.join(__dirname, '../assets/logo.png');
 
 // Recupera la lista completa de clientes registrados
 const obtenerClientes = async (req, res) => {
@@ -132,12 +139,16 @@ const generarReporteClientes = async (req, res) => {
         res.setHeader('Content-Disposition', 'attachment; filename=reporte_clientes.pdf');
         doc.pipe(res);
 
+        if (fs.existsSync(logoPath)) {
+            doc.image(logoPath, 30, 30, { width: 50 });
+        }
+
         doc.fontSize(20).text('Reporte de Clientes - AgenciaVJ', { align: 'center' });
         doc.moveDown();
         doc.fontSize(12).text(`Fecha de generación: ${new Date().toLocaleString()}`, { align: 'center' });
-        doc.moveDown();
+        doc.moveDown(2);
 
-        const tableTop = 140;
+        const tableTop = 150;
         const cols = {
             id: { x: 30, w: 40 },
             ced: { x: 80, w: 70 },

@@ -1,5 +1,12 @@
 import db from '../config/db.js';
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const logoPath = path.join(__dirname, '../assets/logo.png');
 
 const crearVenta = async (req, res) => {
     try {
@@ -255,20 +262,29 @@ const recentVentas = async (req, res) => {
 
 const generarReporteVentas = async (req, res) => {
     try {
-        // 1. EXTRAER PARÁMETROS DE FILTRADO
         const { fechaInicio, fechaFin, tipo, aerolinea } = req.query;
 
-        // 2. CONSTRUIR LA CONSULTA SQL DINÁMICA
         let sqlQuery = `
             SELECT 
                 r.localizador,
                 b.numero_boleto,
-                CONCAT(c.nombre, ' ', c.apellido) as pasajero,
+                c.nombre,
+                c.apellido,
+                c.cedula,
+                c.telefono,
+                c.email,
                 a.nombre as aerolinea,
                 b.ruta,
                 b.fecha_ida,
+                b.fecha_retorno,
+                b.monto_neto,
+                b.fee_emision,
                 b.monto_venta,
-                b.utilidad
+                b.fee_comision,
+                b.utilidad,
+                b.tipo,
+                r.estado,
+                r.fecha_venta
             FROM boletos b
             JOIN clientes c ON b.cliente_id = c.id_cliente
             JOIN aerolineas a ON b.aerolinea_id = a.id_aerolinea
@@ -278,103 +294,110 @@ const generarReporteVentas = async (req, res) => {
         
         const queryParams = [];
 
-        // Filtro por rango de fechas
         if (fechaInicio && fechaFin) {
             sqlQuery += ` AND b.fecha_ida BETWEEN ? AND ?`;
             queryParams.push(fechaInicio, fechaFin);
         }
 
-        // Filtro por tipo 
         if (tipo) {
             sqlQuery += ` AND b.tipo = ?`; 
             queryParams.push(tipo);
         }
 
-        // Filtro por aerolinea
         if (aerolinea) {
             sqlQuery += ` AND a.nombre = ?`;
             queryParams.push(aerolinea);
         }
 
-        sqlQuery += ` ORDER BY b.fecha_ida DESC`;
+        sqlQuery += ` ORDER BY r.fecha_venta DESC`;
 
-        // Ejecutar consulta con parámetros seguros
         const [rows] = await db.query(sqlQuery, queryParams);
 
-        // 3. GENERAR EL PDF
-        const doc = new PDFDocument({ margin: 30 });
+        const doc = new PDFDocument({ margin: 40 });
 
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename=reporte_ventas.pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=reporte_ventas_detallado.pdf');
 
         doc.pipe(res);
 
-        // Encabezado
-        doc.fontSize(20).text('Reporte de Ventas - Viajando juntos agencia', { align: 'center' });
+        // Logo
+        if (fs.existsSync(logoPath)) {
+            doc.image(logoPath, 40, 40, { width: 50 });
+        }
+
+        doc.fontSize(20).text('Reporte Detallado de Ventas', { align: 'center' });
         doc.moveDown();
         doc.fontSize(12).text(`Fecha de generación: ${new Date().toLocaleString()}`, { align: 'center' });
         doc.moveDown();
        
-        // Si hay filtros aplicados, mostrarlos en el PDF (Opcional pero recomendado)
         if (fechaInicio || tipo || aerolinea) {
-            doc.fontSize(10).text(`Filtros: ${fechaInicio ? `Desde ${fechaInicio} Hasta ${fechaFin}` : ''} ${tipo ? `| Tipo: ${tipo}` : ''} ${aerolinea ? `| Aerolínea: ${aerolinea}` : ''}`, { align: 'center' });
+            doc.fontSize(10).fillColor('#666666').text(`Filtros aplicados: ${fechaInicio ? `Desde ${fechaInicio} Hasta ${fechaFin}` : ''} ${tipo ? `| Tipo: ${tipo}` : ''} ${aerolinea ? `| Aerolínea: ${aerolinea}` : ''}`, { align: 'center' });
         }
-        doc.moveDown();
+        doc.moveDown(2);
 
-        // 4. CONFIGURACIÓN DE COLUMNAS (Posición X y Ancho Máximo)
-        const tableTop = 140;
-        const cols = {
-            loc: { x: 30, w: 60 },
-            pas: { x: 90, w: 130 },  // Más espacio para los nombres
-            aer: { x: 230, w: 90 },
-            rut: { x: 330, w: 90 },
-            mon: { x: 430, w: 50 },
-            uti: { x: 490, w: 60 }
-        };
-
-        // Encabezados de tabla
-        doc.fontSize(10).font('Helvetica-Bold');
-        doc.text('Localizador', cols.loc.x, tableTop);
-        doc.text('Pasajero', cols.pas.x, tableTop);
-        doc.text('Aerolínea', cols.aer.x, tableTop);
-        doc.text('Ruta', cols.rut.x, tableTop);
-        doc.text('Monto', cols.mon.x, tableTop);
-        doc.text('Utilidad', cols.uti.x, tableTop);
-
-        doc.moveTo(30, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-
-        let currentTop = tableTop + 25;
-        doc.font('Helvetica');
-
-        // Configuración para evitar que el texto se salga de la casilla
-        const textOpts = (width) => ({ 
-            width: width, 
-            height: 15, 
-            ellipsis: true, // Agrega "..." si es muy largo
-            lineBreak: false // Evita que salte a la siguiente línea
-        });
-
-        rows.forEach(row => {
-            if (currentTop > 700) {
+        // Diseño Bloque / Ficha por Cliente
+        rows.forEach((row, index) => {
+            // Verificar si hay espacio suficiente en la página actual
+            if (doc.y > 600) {
                 doc.addPage();
-                currentTop = 50;
             }
+
+            // Encabezado de la Ficha
+            doc.rect(40, doc.y, 530, 20).fill('#3b82f6');
+            doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold');
+            doc.text(`Localizador: ${row.localizador} | Venta: ${new Date(row.fecha_venta).toLocaleDateString()}`, 50, doc.y + 5);
+            doc.moveDown(1.5);
             
-            // Imprimir datos limitando el ancho para que no se superpongan
-            doc.text(row.localizador || '-', cols.loc.x, currentTop, textOpts(cols.loc.w));
-            doc.text(row.pasajero || '-', cols.pas.x, currentTop, textOpts(cols.pas.w));
-            doc.text(row.aerolinea || '-', cols.aer.x, currentTop, textOpts(cols.aer.w));
-            doc.text(row.ruta || '-', cols.rut.x, currentTop, textOpts(cols.rut.w));
-            doc.text(`$${row.monto_venta || 0}`, cols.mon.x, currentTop, textOpts(cols.mon.w));
-            doc.text(`$${row.utilidad || 0}`, cols.uti.x, currentTop, textOpts(cols.uti.w));
+            // Sección Cliente
+            doc.fillColor('#333333').fontSize(10).font('Helvetica-Bold');
+            doc.text('DATOS DEL CLIENTE', 50, doc.y);
+            doc.font('Helvetica');
+            doc.text(`Nombre: ${row.nombre} ${row.apellido}`, 50, doc.y + 5);
+            doc.text(`Documento: ${row.cedula}`, 250, doc.y - 12);
+            doc.text(`Teléfono: ${row.telefono}`, 400, doc.y - 12);
+            doc.text(`Correo: ${row.email}`, 50, doc.y + 5);
+            doc.moveDown(1);
             
-            currentTop += 20;
+            // Sección Vuelo
+            doc.font('Helvetica-Bold').text('DATOS DEL VUELO', 50, doc.y);
+            doc.font('Helvetica');
+            doc.text(`Boleto Nro: ${row.numero_boleto}`, 50, doc.y + 5);
+            doc.text(`Aerolínea: ${row.aerolinea}`, 250, doc.y - 12);
+            doc.text(`Estado: ${row.estado}`, 400, doc.y - 12);
+            doc.text(`Ruta: ${row.ruta}`, 50, doc.y + 5);
+            doc.text(`Fecha Ida: ${new Date(row.fecha_ida).toLocaleDateString()}`, 250, doc.y - 12);
+            if (row.fecha_retorno) {
+                doc.text(`Fecha Retorno: ${new Date(row.fecha_retorno).toLocaleDateString()}`, 400, doc.y - 12);
+            }
+            doc.moveDown(1);
+            
+            // Sección Finanzas
+            doc.font('Helvetica-Bold').text('DESGLOSE FINANCIERO', 50, doc.y);
+            doc.font('Helvetica');
+            doc.text(`Monto Neto: $${row.monto_neto}`, 50, doc.y + 5);
+            doc.text(`Fee Emisión: $${row.fee_emision}`, 180, doc.y - 12);
+            doc.text(`Utilidad: $${row.utilidad}`, 310, doc.y - 12);
+            doc.font('Helvetica-Bold');
+            doc.text(`MONTO VENTA: $${row.monto_venta}`, 440, doc.y - 12);
+            
+            doc.moveDown(1);
+            doc.font('Helvetica');
+            doc.text(`Comisión Generada: $${row.fee_comision}`, 50, doc.y);
+            
+            // Separador
+            doc.moveDown(1);
+            doc.moveTo(40, doc.y).lineTo(570, doc.y).strokeColor('#dddddd').stroke();
+            doc.moveDown(1);
         });
+
+        if (rows.length === 0) {
+            doc.fontSize(12).fillColor('#333333').text('No se encontraron ventas para los filtros seleccionados.', { align: 'center' });
+        }
 
         doc.end();
 
     } catch (error) {
-        console.error("Error generando reporte PDF:", error);
+        console.error("Error generando reporte PDF detallado:", error);
         res.status(500).json({ 
             exito: false, 
             mensaje: 'Error al generar el reporte PDF' 
