@@ -1,8 +1,8 @@
 import { Router } from 'express';
 const router = Router();
-import { listarPaquetes, crearPaquete, venderPaquete, generarReportePaquetes } from '../controllers/paquetesController.js';
+import { listarPaquetes, listarTodosPaquetes, crearPaquete, venderPaquete, cambiarEstadoPaquete, generarReportePaquetes, obtenerVentasPaquetes } from '../controllers/paquetesController.js';
 import { registrarUsuario, loginUsuario } from '../controllers/authController.js';
-import { crearVenta, obtenerVentas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta, actualizarEstadoVenta } from '../controllers/ventaController.js';
+import { crearVenta, obtenerVentas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta, actualizarEstadoVenta, editarVenta } from '../controllers/ventaController.js';
 import { obtenerClientes, obtenerClientePorId, crearCliente, actualizarCliente, eliminarCliente, generarReporteClientes } from '../controllers/clientesController.js';
 import { obtenerAerolineas, crearAerolinea, actualizarAerolinea, eliminarAerolinea } from '../controllers/aerolineasController.js';
 import { obtenerUsuarios, actualizarUsuario, eliminarUsuario } from '../controllers/usersController.js';
@@ -41,6 +41,7 @@ router.get('/ventas/recent', recentVentas);
 router.get('/ventas/reporte', generarReporteVentas);
 router.delete('/ventas/:id', authMiddleware, eliminarVenta);
 router.put('/ventas/estado/:localizador', authMiddleware, actualizarEstadoVenta);
+router.put('/ventas/editar/:id', authMiddleware, editarVenta);
 
 // Rutas de Comisiones
 router.get('/comisiones/mis-comisiones', authMiddleware, misComisiones);
@@ -49,8 +50,11 @@ router.put('/comisiones/pagar/:id_transaccion', authMiddleware, isAdmin, pagarCo
 
 // Rutas del catálogo
 router.get('/paquetes', listarPaquetes);
+router.get('/paquetes/todos', authMiddleware, listarTodosPaquetes);
 router.get('/paquetes/reporte', generarReportePaquetes);
+router.get('/paquetes/ventas', authMiddleware, obtenerVentasPaquetes);
 router.post('/paquetes', crearPaquete);
+router.put('/paquetes/:id/estado', authMiddleware, isAdmin, cambiarEstadoPaquete);
 
 // Rutas Auxiliares
 router.get('/aerolineas', obtenerAerolineas);

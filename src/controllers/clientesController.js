@@ -129,63 +129,146 @@ const eliminarCliente = async (req, res) => {
     }
 };
 
-// Genera un PDF de todos los clientes
+// Genera un PDF detallado de clientes y sus compras
 const generarReporteClientes = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM clientes ORDER BY nombre ASC');
+        const { nombre } = req.query;
+        let query = `
+            SELECT 
+                c.id_cliente, c.nombre, c.apellido, c.cedula, c.telefono, c.email,
+                b.numero_boleto, b.ruta, b.fecha_ida, b.fecha_retorno, b.monto_neto, b.fee_emision, b.monto_venta, b.utilidad,
+                r.localizador, r.estado_pago, r.fecha_venta,
+                a.nombre as aerolinea,
+                u.nombre as agente
+            FROM clientes c
+            LEFT JOIN boletos b ON c.id_cliente = b.cliente_id
+            LEFT JOIN reservas r ON b.localizador_id = r.localizador
+            LEFT JOIN aerolineas a ON b.aerolinea_id = a.id_aerolinea
+            LEFT JOIN usuarios u ON b.usuario_id = u.id_usuario
+        `;
         
-        const doc = new PDFDocument({ margin: 30 });
+        const queryParams = [];
+
+        if (nombre) {
+            query += " WHERE c.nombre LIKE ? OR c.apellido LIKE ?";
+            const searchTerm = `%${nombre}%`;
+            queryParams.push(searchTerm, searchTerm);
+        }
+        query += " ORDER BY c.nombre ASC, c.apellido ASC, r.fecha_venta DESC";
+
+        const [rows] = await db.query(query, queryParams);
+
+        // Agrupar por cliente
+        const clientesAgrupados = {};
+        rows.forEach(row => {
+            if (!clientesAgrupados[row.id_cliente]) {
+                clientesAgrupados[row.id_cliente] = {
+                    datos: {
+                        nombre: row.nombre,
+                        apellido: row.apellido,
+                        cedula: row.cedula,
+                        telefono: row.telefono,
+                        email: row.email
+                    },
+                    compras: []
+                };
+            }
+            if (row.numero_boleto || row.localizador) {
+                clientesAgrupados[row.id_cliente].compras.push(row);
+            }
+        });
+        
+        const doc = new PDFDocument({ margin: 40 });
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename=reporte_clientes.pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=reporte_clientes_detallado.pdf');
         doc.pipe(res);
 
         if (fs.existsSync(logoPath)) {
-            doc.image(logoPath, 30, 30, { width: 50 });
+            doc.image(logoPath, 40, 40, { width: 50 });
         }
 
-        doc.fontSize(20).text('Reporte de Clientes - AgenciaVJ', { align: 'center' });
+        doc.fontSize(20).text('Reporte Detallado de Clientes y Compras', { align: 'center' });
         doc.moveDown();
         doc.fontSize(12).text(`Fecha de generación: ${new Date().toLocaleString()}`, { align: 'center' });
         doc.moveDown(2);
 
-        const tableTop = 150;
-        const cols = {
-            id: { x: 30, w: 40 },
-            ced: { x: 80, w: 70 },
-            nom: { x: 160, w: 120 },
-            tel: { x: 290, w: 90 },
-            ema: { x: 390, w: 160 }
-        };
-
-        doc.fontSize(10).font('Helvetica-Bold');
-        doc.text('ID', cols.id.x, tableTop);
-        doc.text('Cédula', cols.ced.x, tableTop);
-        doc.text('Cliente', cols.nom.x, tableTop);
-        doc.text('Teléfono', cols.tel.x, tableTop);
-        doc.text('Correo', cols.ema.x, tableTop);
-        doc.moveTo(30, tableTop + 15).lineTo(560, tableTop + 15).stroke();
-
-        let currentTop = tableTop + 25;
-        doc.font('Helvetica');
-        const textOpts = (width) => ({ width: width, height: 15, ellipsis: true, lineBreak: false });
-
-        rows.forEach(row => {
-            if (currentTop > 700) {
-                doc.addPage();
-                currentTop = 50;
+        if (Object.keys(clientesAgrupados).length === 0) {
+            doc.fontSize(12).fillColor('#333333').text('No se encontraron clientes.', { align: 'center' });
+        } else {
+            for (const [id_cliente, cliente] of Object.entries(clientesAgrupados)) {
+                if (doc.y > 650) doc.addPage();
+                
+                // --- ENCABEZADO DEL CLIENTE ---
+                doc.rect(40, doc.y, 530, 25).fill('#1e293b'); // Dark blue/slate
+                doc.fillColor('#ffffff').fontSize(14).font('Helvetica-Bold');
+                doc.text(`CLIENTE: ${cliente.datos.nombre} ${cliente.datos.apellido}`, 50, doc.y + 7);
+                doc.moveDown(1.5);
+                
+                doc.fillColor('#333333').fontSize(10).font('Helvetica');
+                doc.text(`Documento: ${cliente.datos.cedula || 'N/A'}`, 50, doc.y);
+                doc.text(`Teléfono: ${cliente.datos.telefono || 'N/A'}`, 250, doc.y - 12);
+                doc.text(`Correo: ${cliente.datos.email || 'N/A'}`, 400, doc.y - 12);
+                doc.moveDown(1);
+                
+                // --- COMPRAS DEL CLIENTE ---
+                if (cliente.compras.length === 0) {
+                    doc.font('Helvetica-Oblique').fillColor('#666666').text('Sin compras registradas.', 50, doc.y);
+                    doc.moveDown(1.5);
+                } else {
+                    cliente.compras.forEach(compra => {
+                        if (doc.y > 650) doc.addPage();
+                        
+                        // Ficha de Venta (Estilo Reporte Ventas)
+                        doc.rect(50, doc.y, 510, 20).fill('#3b82f6');
+                        doc.fillColor('#ffffff').fontSize(11).font('Helvetica-Bold');
+                        const fechaVenta = compra.fecha_venta ? new Date(compra.fecha_venta).toLocaleDateString() : 'N/A';
+                        doc.text(`Localizador: ${compra.localizador || 'N/A'} | Venta: ${fechaVenta}`, 60, doc.y + 5);
+                        doc.moveDown(1.5);
+                        
+                        doc.fillColor('#333333').fontSize(10);
+                        
+                        // Agente
+                        doc.font('Helvetica-Bold').text('AGENTE DE VENTAS', 60, doc.y);
+                        doc.font('Helvetica');
+                        doc.text(`Vendido por: ${compra.agente || 'Sistema'}`, 60, doc.y + 5);
+                        doc.moveDown(1);
+                        
+                        // Datos Vuelo
+                        doc.font('Helvetica-Bold').text('DATOS DEL VUELO', 60, doc.y);
+                        doc.font('Helvetica');
+                        doc.text(`Boleto Nro: ${compra.numero_boleto || 'N/A'}`, 60, doc.y + 5);
+                        doc.text(`Aerolínea: ${compra.aerolinea || 'N/A'}`, 250, doc.y - 12);
+                        doc.text(`Estado: ${compra.estado_pago || 'Pendiente'}`, 400, doc.y - 12);
+                        doc.text(`Ruta: ${compra.ruta || 'N/A'}`, 60, doc.y + 5);
+                        const fechaIda = compra.fecha_ida ? new Date(compra.fecha_ida).toLocaleDateString() : 'N/A';
+                        doc.text(`Fecha Ida: ${fechaIda}`, 250, doc.y - 12);
+                        if (compra.fecha_retorno) {
+                            doc.text(`Fecha Retorno: ${new Date(compra.fecha_retorno).toLocaleDateString()}`, 400, doc.y - 12);
+                        }
+                        doc.moveDown(1);
+                        
+                        // Desglose Financiero
+                        doc.font('Helvetica-Bold').text('DESGLOSE FINANCIERO', 60, doc.y);
+                        doc.font('Helvetica');
+                        doc.text(`Monto Neto: $${compra.monto_neto || 0}`, 60, doc.y + 5);
+                        doc.text(`Fee Emisión: $${compra.fee_emision || 0}`, 200, doc.y - 12);
+                        doc.text(`Utilidad: $${compra.utilidad || 0}`, 340, doc.y - 12);
+                        doc.font('Helvetica-Bold');
+                        doc.text(`TOTAL VENTA: $${compra.monto_venta || 0}`, 60, doc.y + 10);
+                        
+                        doc.moveDown(1.5);
+                    });
+                }
+                
+                doc.moveTo(40, doc.y).lineTo(570, doc.y).strokeColor('#aaaaaa').stroke();
+                doc.moveDown(1.5);
             }
-            doc.text(row.id_cliente.toString(), cols.id.x, currentTop, textOpts(cols.id.w));
-            doc.text(row.cedula || '-', cols.ced.x, currentTop, textOpts(cols.ced.w));
-            doc.text(`${row.nombre} ${row.apellido}`, cols.nom.x, currentTop, textOpts(cols.nom.w));
-            doc.text(row.telefono || '-', cols.tel.x, currentTop, textOpts(cols.tel.w));
-            doc.text(row.email || '-', cols.ema.x, currentTop, textOpts(cols.ema.w));
-            currentTop += 20;
-        });
+        }
 
         doc.end();
     } catch (error) {
         console.error("Error generando reporte PDF de clientes:", error);
-        res.status(500).json({ exito: false, mensaje: 'Error al generar el reporte PDF' });
+        res.status(500).json({ success: false, message: 'Error al generar el reporte PDF' });
     }
 };
 

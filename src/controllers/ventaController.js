@@ -22,7 +22,8 @@ const crearVenta = async (req, res) => {
             fecha_venta,
             aerolinea_id,
             cliente_id,
-            tipo = 'BOLETO'
+            tipo = 'BOLETO',
+            paquete_id
         } = req.body;
 
         // Validación y Recálculo en Servidor (Seguridad Financiera)
@@ -35,9 +36,11 @@ const crearVenta = async (req, res) => {
 
         const usuarioId = req.user.id;
 
+        const estadoPago = (tipo === 'BOLETO') ? 'Emitido' : 'Pendiente';
+
         await db.execute(
-            'INSERT IGNORE INTO reservas (localizador, fecha_venta) VALUES (?, ?)', 
-            [localizador, fecha_venta]
+            'INSERT INTO reservas (localizador, fecha_venta, estado_pago) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE estado_pago = VALUES(estado_pago)', 
+            [localizador, fecha_venta, estadoPago]
         );
 
         const queryBoleto = `INSERT INTO boletos 
@@ -61,6 +64,22 @@ const crearVenta = async (req, res) => {
             tipo
         ]);
 
+        // Si es una venta de paquete turístico, registrar en paquetes_vendidos
+        if (paquete_id) {
+            const queryPaqueteVendido = `INSERT INTO paquetes_vendidos 
+                (paquete_id, localizador_id, cliente_id, fecha_viaje_inicio, fecha_viaje_fin, monto_venta_final, utilidad) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            await db.execute(queryPaqueteVendido, [
+                paquete_id,
+                localizador,
+                cliente_id,
+                fecha_ida,
+                fecha_retorno,
+                venta,
+                utilidad
+            ]);
+        }
+
         res.status(201).json({ exito: true, mensaje: 'Venta registrada correctamente' });
     } catch (error) {
         console.error(error);
@@ -71,7 +90,7 @@ const crearVenta = async (req, res) => {
 const actualizarEstadoVenta = async (req, res) => {
     try {
         const { localizador } = req.params;
-        const { estado } = req.body; // Ej: 'Emitido', 'Pendiente', 'Cancelado'
+        const { estado, numero_boleto } = req.body; // Ej: 'Emitido', 'Pendiente', 'Cancelado'
 
         if (!estado) {
             return res.status(400).json({ exito: false, mensaje: 'El estado es requerido' });
@@ -82,6 +101,12 @@ const actualizarEstadoVenta = async (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ exito: false, mensaje: 'Reserva no encontrada con ese localizador' });
         }
+
+        // Si el estado es Emitido y se proporcionó un número de boleto, lo actualizamos
+        if (estado.toLowerCase() === 'emitido' && numero_boleto) {
+            await db.execute('UPDATE boletos SET numero_boleto = ?, tipo = ? WHERE localizador_id = ?', [numero_boleto, 'BOLETO', localizador]);
+        }
+
         res.json({ exito: true, mensaje: 'Estado de la reserva actualizado correctamente' });
     } catch (error) {
         console.error(error);
@@ -108,14 +133,20 @@ const obtenerVentas = async (req, res) => {
                 b.id_transaccion,
                 r.localizador,
                 b.numero_boleto,
+                c.id_cliente as cliente_id,
                 CONCAT(c.nombre, ' ', c.apellido) as pasajero,
+                a.id_aerolinea as aerolinea_id,
                 a.nombre as aerolinea,
                 b.ruta,
                 b.fecha_ida,
+                b.fecha_retorno,
+                b.monto_neto,
+                b.fee_emision,
                 b.monto_venta,
                 b.utilidad,
                 b.fee_comision,
                 b.tipo,
+                b.comentarios,
                 r.estado_pago,
                 r.fecha_venta
             FROM boletos b
@@ -137,15 +168,24 @@ const getVentasFiltradas = async (req, res) => {
     // 2. Base de la consulta con todos los JOINs necesarios
     let sql = `
         SELECT 
+            b.id_transaccion,
             r.localizador,
             b.numero_boleto,
+            c.id_cliente as cliente_id,
             c.nombre AS nombre_cliente,
             c.apellido AS apellido_cliente,
+            a.id_aerolinea as aerolinea_id,
             a.nombre AS aerolinea,
             b.ruta,
             b.fecha_ida,
+            b.fecha_retorno,
+            b.monto_neto,
+            b.fee_emision,
             b.monto_venta,
             b.utilidad,
+            b.fee_comision,
+            b.tipo,
+            b.comentarios,
             r.estado_pago,
             r.fecha_venta
         FROM boletos b
@@ -411,4 +451,73 @@ const generarReporteVentas = async (req, res) => {
     }
 };
 
-export { crearVenta, obtenerVentas, getVentasFiltradas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta, actualizarEstadoVenta };
+const editarVenta = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { 
+            numero_boleto,
+            ruta, 
+            fecha_ida, 
+            fecha_retorno, 
+            monto_neto, 
+            fee_emision, 
+            monto_venta,
+            aerolinea_id,
+            cliente_id,
+            comentarios
+        } = req.body;
+
+        // Recálculo en Servidor (Seguridad Financiera)
+        const neto = parseFloat(monto_neto) || 0;
+        const emision = parseFloat(fee_emision) || 0;
+        const venta = parseFloat(monto_venta) || 0;
+
+        const utilidad = venta - neto - emision;
+        const fee_comision = utilidad * 0.20;
+
+        const query = `
+            UPDATE boletos 
+            SET 
+                numero_boleto = ?, 
+                ruta = ?, 
+                fecha_ida = ?, 
+                fecha_retorno = ?, 
+                monto_neto = ?, 
+                fee_emision = ?, 
+                monto_venta = ?, 
+                utilidad = ?, 
+                fee_comision = ?, 
+                aerolinea_id = ?, 
+                cliente_id = ?,
+                comentarios = ?
+            WHERE id_transaccion = ?
+        `;
+
+        const [result] = await db.execute(query, [
+            numero_boleto, 
+            ruta, 
+            fecha_ida, 
+            fecha_retorno, 
+            neto, 
+            emision, 
+            venta, 
+            utilidad, 
+            fee_comision,
+            aerolinea_id,
+            cliente_id,
+            comentarios,
+            id
+        ]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ exito: false, mensaje: 'Venta no encontrada' });
+        }
+
+        res.json({ exito: true, mensaje: 'Venta actualizada correctamente' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ exito: false, mensaje: 'Error al actualizar la venta' });
+    }
+};
+
+export { crearVenta, obtenerVentas, getVentasFiltradas, statsVenta, recentVentas, generarReporteVentas, eliminarVenta, actualizarEstadoVenta, editarVenta };

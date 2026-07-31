@@ -20,6 +20,32 @@ export async function listarPaquetes(req, res) {
     }
 }
 
+export async function listarTodosPaquetes(req, res) {
+    try {
+        const paquetes = await Paquete.obtenerTodos();
+        res.status(200).json({ success: true, data: paquetes });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al obtener todos los paquetes', error: error.message });
+    }
+}
+
+export async function cambiarEstadoPaquete(req, res) {
+    try {
+        const { id } = req.params;
+        const { estado } = req.body;
+        if (!['Activo', 'Inactivo'].includes(estado)) {
+            return res.status(400).json({ success: false, message: 'Estado inválido. Debe ser Activo o Inactivo.' });
+        }
+        const affected = await Paquete.actualizarEstado(id, estado);
+        if (affected === 0) {
+            return res.status(404).json({ success: false, message: 'Paquete no encontrado.' });
+        }
+        res.json({ success: true, message: `Paquete actualizado a ${estado}` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al actualizar el estado', error: error.message });
+    }
+}
+
 export async function crearPaquete(req, res) {
     try {
         const insertId = await Paquete.crear(req.body);
@@ -71,9 +97,46 @@ export async function venderPaquete(req, res) {
 
 export async function generarReportePaquetes(req, res) {
     try {
+        const { fechaInicio, fechaFin } = req.query;
         const paquetes = await Paquete.obtenerActivos();
         
-        const doc = new PDFDocument({ margin: 30 });
+        const conn = await getConnection();
+        let query = `
+            SELECT 
+                pv.id_venta_paquete,
+                pt.nombre_paquete,
+                pt.destino_ruta,
+                CONCAT(c.nombre, ' ', c.apellido) as cliente,
+                c.cedula,
+                pv.localizador_id,
+                pv.fecha_viaje_inicio,
+                pv.fecha_viaje_fin,
+                pv.monto_venta_final,
+                pv.utilidad,
+                u.nombre as agente
+            FROM paquetes_vendidos pv
+            JOIN paquetes_turisticos pt ON pv.paquete_id = pt.id_paquete
+            JOIN clientes c ON pv.cliente_id = c.id_cliente
+            LEFT JOIN reservas r ON pv.localizador_id = r.localizador
+            LEFT JOIN boletos b ON b.localizador_id = r.localizador
+            LEFT JOIN usuarios u ON b.usuario_id = u.id_usuario
+        `;
+        
+        const queryParams = [];
+        if (fechaInicio) {
+            query += " WHERE pv.fecha_viaje_inicio >= ?";
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            query += (queryParams.length > 0 ? " AND" : " WHERE") + " pv.fecha_viaje_inicio <= ?";
+            queryParams.push(fechaFin);
+        }
+        query += " ORDER BY pv.fecha_viaje_inicio DESC";
+
+        const [ventas] = await conn.query(query, queryParams);
+        conn.release();
+
+        const doc = new PDFDocument({ margin: 30, size: 'A4' });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'attachment; filename=reporte_paquetes.pdf');
         doc.pipe(res);
@@ -82,21 +145,25 @@ export async function generarReportePaquetes(req, res) {
             doc.image(logoPath, 30, 30, { width: 50 });
         }
 
-        doc.fontSize(20).text('Catálogo de Paquetes - AgenciaVJ', { align: 'center' });
+        doc.fontSize(20).text('Reporte de Paquetes Turísticos', { align: 'center' });
         doc.moveDown();
         doc.fontSize(12).text(`Fecha de generación: ${new Date().toLocaleString()}`, { align: 'center' });
         doc.moveDown(2);
 
-        const tableTop = 150;
+        // SECCIÓN 1: CATÁLOGO DE PAQUETES
+        doc.fontSize(16).fillColor('#2c3e50').text('Catálogo de Paquetes Activos');
+        doc.moveDown(0.5);
+        
+        let tableTop = doc.y;
         const cols = {
-            id: { x: 30, w: 40 },
-            nom: { x: 80, w: 150 },
-            des: { x: 240, w: 120 },
-            dur: { x: 370, w: 60 },
-            pre: { x: 440, w: 110 }
+            id: { x: 30, w: 30 },
+            nom: { x: 70, w: 160 },
+            des: { x: 240, w: 130 },
+            dur: { x: 380, w: 60 },
+            pre: { x: 450, w: 100 }
         };
 
-        doc.fontSize(10).font('Helvetica-Bold');
+        doc.fontSize(10).fillColor('#000000').font('Helvetica-Bold');
         doc.text('ID', cols.id.x, tableTop);
         doc.text('Paquete', cols.nom.x, tableTop);
         doc.text('Destino', cols.des.x, tableTop);
@@ -109,7 +176,7 @@ export async function generarReportePaquetes(req, res) {
         const textOpts = (width) => ({ width: width, height: 15, ellipsis: true, lineBreak: false });
 
         paquetes.forEach(row => {
-            if (currentTop > 700) {
+            if (currentTop > 750) {
                 doc.addPage();
                 currentTop = 50;
             }
@@ -121,6 +188,57 @@ export async function generarReportePaquetes(req, res) {
             currentTop += 20;
         });
 
+        // SECCIÓN 2: HISTORIAL DE VENTAS
+        doc.addPage();
+        
+        if (fs.existsSync(logoPath)) {
+            doc.image(logoPath, 30, 30, { width: 50 });
+        }
+        doc.fontSize(20).text('Historial de Ventas de Paquetes', { align: 'center' });
+        doc.moveDown(2);
+
+        const vCols = {
+            paq: { x: 30, w: 100 },
+            cli: { x: 140, w: 100 },
+            age: { x: 250, w: 80 },
+            fec: { x: 340, w: 60 },
+            loc: { x: 410, w: 60 },
+            mnt: { x: 480, w: 80 }
+        };
+
+        tableTop = doc.y;
+        doc.fontSize(10).font('Helvetica-Bold');
+        doc.text('Paquete', vCols.paq.x, tableTop);
+        doc.text('Cliente', vCols.cli.x, tableTop);
+        doc.text('Agente', vCols.age.x, tableTop);
+        doc.text('Fechas', vCols.fec.x, tableTop);
+        doc.text('Localizador', vCols.loc.x, tableTop);
+        doc.text('Venta / Util.', vCols.mnt.x, tableTop);
+        doc.moveTo(30, tableTop + 15).lineTo(560, tableTop + 15).stroke();
+
+        currentTop = tableTop + 25;
+        doc.font('Helvetica');
+
+        ventas.forEach(v => {
+            if (currentTop > 750) {
+                doc.addPage();
+                currentTop = 50;
+            }
+            
+            doc.text(v.nombre_paquete || '-', vCols.paq.x, currentTop, textOpts(vCols.paq.w));
+            doc.text(v.cliente || '-', vCols.cli.x, currentTop, textOpts(vCols.cli.w));
+            doc.text(v.agente || 'N/A', vCols.age.x, currentTop, textOpts(vCols.age.w));
+            
+            const fechaViaje = v.fecha_viaje_inicio ? new Date(v.fecha_viaje_inicio).toLocaleDateString() : '-';
+            doc.text(fechaViaje, vCols.fec.x, currentTop, textOpts(vCols.fec.w));
+            
+            doc.text(v.localizador_id || '-', vCols.loc.x, currentTop, textOpts(vCols.loc.w));
+            
+            doc.text(`$${v.monto_venta_final || 0} / $${v.utilidad || 0}`, vCols.mnt.x, currentTop, textOpts(vCols.mnt.w));
+            
+            currentTop += 20;
+        });
+
         doc.end();
     } catch (error) {
         console.error("Error generando reporte PDF de paquetes:", error);
@@ -128,3 +246,34 @@ export async function generarReportePaquetes(req, res) {
     }
 }
 
+export async function obtenerVentasPaquetes(req, res) {
+    try {
+        const conn = await getConnection();
+        const [rows] = await conn.query(`
+            SELECT 
+                pv.id_venta_paquete,
+                pt.nombre_paquete,
+                pt.destino_ruta,
+                CONCAT(c.nombre, ' ', c.apellido) as cliente,
+                c.cedula,
+                pv.localizador_id,
+                pv.fecha_viaje_inicio,
+                pv.fecha_viaje_fin,
+                pv.monto_venta_final,
+                pv.utilidad,
+                u.nombre as agente
+            FROM paquetes_vendidos pv
+            JOIN paquetes_turisticos pt ON pv.paquete_id = pt.id_paquete
+            JOIN clientes c ON pv.cliente_id = c.id_cliente
+            LEFT JOIN reservas r ON pv.localizador_id = r.localizador
+            LEFT JOIN boletos b ON b.localizador_id = r.localizador
+            LEFT JOIN usuarios u ON b.usuario_id = u.id_usuario
+            ORDER BY pv.fecha_viaje_inicio DESC
+        `);
+        conn.release();
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Error obteniendo ventas de paquetes:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener ventas de paquetes', error: error.message });
+    }
+}
