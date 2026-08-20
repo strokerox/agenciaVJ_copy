@@ -2,7 +2,7 @@ import db from '../config/db.js';
 
 const obtenerUsuarios = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT id_usuario, nombre, email, rol FROM usuarios');
+        const [rows] = await db.query('SELECT id_usuario, nombre, email, rol, porcentaje_comision FROM usuarios');
         res.json(rows);
     } catch (error) {
         console.error(error);
@@ -13,10 +13,11 @@ const obtenerUsuarios = async (req, res) => {
 const actualizarUsuario = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nombre, email, rol } = req.body;
+        const { nombre, email, rol, porcentaje_comision } = req.body;
+        const comision = (porcentaje_comision !== undefined && porcentaje_comision !== null) ? parseFloat(porcentaje_comision) : 20;
         const [result] = await db.execute(
-            'UPDATE usuarios SET nombre = ?, email = ?, rol = ? WHERE id_usuario = ?', 
-            [nombre, email, rol, id]
+            'UPDATE usuarios SET nombre = ?, email = ?, rol = ?, porcentaje_comision = ? WHERE id_usuario = ?', 
+            [nombre, email, rol, comision, id]
         );
         if (result.affectedRows === 0) {
             return res.status(404).json({ exito: false, mensaje: 'Usuario no encontrado' });

@@ -32,7 +32,7 @@ const registrarUsuario = async (req, res) => {
             exito: true, 
             mensaje: 'Usuario registrado correctamente',
             token,
-            user: { id: userId, nombre, email, rol: 'agente' }
+            user: { id: userId, nombre, email, rol: 'agente', porcentaje_comision: 20 }
         });
     } catch (error) {
         console.error("ERROR EN REGISTRO:", error); // Log detallado
@@ -72,7 +72,7 @@ const loginUsuario = async (req, res) => {
         res.json({ 
             exito: true, 
             token, 
-            user: { id: userId, nombre: user.nombre, email: user.email, rol: user.rol } 
+            user: { id: userId, nombre: user.nombre, email: user.email, rol: user.rol, porcentaje_comision: parseFloat(user.porcentaje_comision) || 20 } 
         });
     } catch (error) {
         console.error("ERROR EN LOGIN:", error); 
@@ -85,7 +85,7 @@ const loginUsuario = async (req, res) => {
 const obtenerUsuarios = async (req, res) => {
     try {
         // No devolvemos la contraseña por seguridad
-        const [rows] = await db.query('SELECT id_usuario, nombre, email, rol, fecha_creacion FROM usuarios');
+        const [rows] = await db.query('SELECT id_usuario, nombre, email, rol, porcentaje_comision, fecha_creacion FROM usuarios');
         res.json(rows);
     } catch (error) {
         console.error("Error al obtener usuarios:", error);

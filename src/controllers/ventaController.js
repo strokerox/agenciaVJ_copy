@@ -32,9 +32,13 @@ const crearVenta = async (req, res) => {
         const venta = parseFloat(monto_venta) || 0;
 
         const utilidad = venta - neto - emision;
-        const fee_comision = utilidad * 0.20;
 
         const usuarioId = req.user.id;
+
+        // Obtener el porcentaje de comisión del agente desde la BD
+        const [userRows] = await db.query('SELECT porcentaje_comision FROM usuarios WHERE id_usuario = ?', [usuarioId]);
+        const porcentajeComision = (userRows.length > 0 && userRows[0].porcentaje_comision != null) ? parseFloat(userRows[0].porcentaje_comision) : 20;
+        const fee_comision = utilidad * (porcentajeComision / 100);
 
         const estadoPago = (tipo === 'BOLETO') ? 'Emitido' : 'Pendiente';
 
@@ -473,7 +477,17 @@ const editarVenta = async (req, res) => {
         const venta = parseFloat(monto_venta) || 0;
 
         const utilidad = venta - neto - emision;
-        const fee_comision = utilidad * 0.20;
+
+        // Obtener el porcentaje de comisión del agente dueño de esta venta
+        const [boletoRows] = await db.query('SELECT usuario_id FROM boletos WHERE id_transaccion = ?', [id]);
+        let porcentajeComision = 20;
+        if (boletoRows.length > 0) {
+            const [userRows] = await db.query('SELECT porcentaje_comision FROM usuarios WHERE id_usuario = ?', [boletoRows[0].usuario_id]);
+            if (userRows.length > 0 && userRows[0].porcentaje_comision != null) {
+                porcentajeComision = parseFloat(userRows[0].porcentaje_comision);
+            }
+        }
+        const fee_comision = utilidad * (porcentajeComision / 100);
 
         const query = `
             UPDATE boletos 
