@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { put } from "@vercel/blob";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +41,18 @@ const crearCliente = async (req, res) => {
     const { nombre, apellido, cedula, telefono, email, nacionalidad } = req.body;
 
     try {
+        const archivo = req.file;
+        let foto_url = null;
+
+        if (archivo) {
+            const blob = await put(archivo.originalname, archivo.buffer, {
+                access: 'public',
+                contentType: archivo.mimetype,
+                addRandomSuffix: true,
+            });
+            foto_url = blob.url;
+        }
+
         // --- 1. VALIDACIÓN DE CÉDULA Y NACIONALIDAD ---
         // Exige que empiece por V-, E- o P- seguido de 6 a 10 dígitos.
         const formatoCedulaRegex = /^(V|E|P)-\d{6,10}$/i;
@@ -83,8 +96,8 @@ const crearCliente = async (req, res) => {
         // --- 3. INSERCIÓN EN MYSQL ---
         // Convertimos la cédula a mayúsculas para mantener uniformidad en la base de datos
         await db.execute(
-            'INSERT INTO clientes (nombre, apellido, cedula, telefono, email, nacionalidad) VALUES (?, ?, ?, ?, ?, ?)',
-            [nombre, apellido, cedula.toUpperCase(), telefonoInternacional, email, nacionalidad]
+            'INSERT INTO clientes (nombre, apellido, cedula, telefono, email, nacionalidad, foto_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [nombre, apellido, cedula.toUpperCase(), telefonoInternacional, email, nacionalidad, foto_url]
         );
         
         res.status(201).json({ success: true, message: 'Cliente registrado con éxito.' });
@@ -101,9 +114,30 @@ const crearCliente = async (req, res) => {
 // Actualiza la información de un cliente existente
 const actualizarCliente = async (req, res) => {
     try {
+        const archivo = req.file;
+        let foto_url = null;
+
+        if (archivo) {
+            const blob = await put(archivo.originalname, archivo.buffer, {
+                access: 'public',
+                contentType: archivo.mimetype,
+                addRandomSuffix: true,
+            });
+            foto_url = blob.url;
+        }
         const { id } = req.params;
         const { nombre, apellido, cedula, telefono, email, nacionalidad } = req.body;
-        const [result] = await db.execute('UPDATE clientes SET nombre = ?, apellido = ?, cedula = ?, telefono = ?, email = ?, nacionalidad = ? WHERE id_cliente = ?', [nombre, apellido, cedula, telefono, email, nacionalidad, id]);
+
+        let result;
+        if(foto_url === null)
+        {
+            [result] = await db.execute('UPDATE clientes SET nombre = ?, apellido = ?, cedula = ?, telefono = ?, email = ?, nacionalidad = ? WHERE id_cliente = ?', [nombre, apellido, cedula, telefono, email, nacionalidad, id]);
+        }
+        else
+        {
+            [result] = await db.execute('UPDATE clientes SET nombre = ?, apellido = ?, cedula = ?, telefono = ?, email = ?, nacionalidad = ?, foto_url = ? WHERE id_cliente = ?', [nombre, apellido, cedula, telefono, email, nacionalidad, foto_url, id]);
+        }
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ exito: false, mensaje: 'Cliente no encontrado' });
         }

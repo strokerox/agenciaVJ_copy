@@ -10,6 +10,12 @@ import { misComisiones, todasLasComisiones, pagarComision } from '../controllers
 import authMiddleware from '../middleware/authMiddleware.js';
 import { isAdmin } from '../middleware/roleMiddleware.js';
 import db from '../config/db.js';
+import multer from 'multer';
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 } // 4 MB
+});
 
 // Ruta raíz de la API
 router.get('/', (req, res) => {
@@ -20,8 +26,8 @@ router.get('/', (req, res) => {
 router.get('/clientes', obtenerClientes);
 router.get('/clientes/reporte', generarReporteClientes);
 router.get('/clientes/:id', obtenerClientePorId);
-router.post('/clientes', crearCliente);
-router.put('/clientes/:id', actualizarCliente);
+router.post('/clientes', upload.single('imagen'), crearCliente);
+router.put('/clientes/:id', upload.single('imagen'), actualizarCliente);
 router.delete('/clientes/:id', eliminarCliente);
 
 // Rutas de Autenticacion
